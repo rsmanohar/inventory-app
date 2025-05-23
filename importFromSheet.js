@@ -1,5 +1,5 @@
 // scripts/importFromSheet.js
-const sqlite3 = require('sqlite3').verbose();
+const Database = require('better-sqlite3'); // Changed to better-sqlite3
 const fetch = (...args) => import('node-fetch').then(mod => mod.default(...args));
 
 // IMPORTANT: Store sensitive information like API keys in environment variables
@@ -11,7 +11,7 @@ const CONFIG = {
   API_KEY: 'AIzaSyCsBBcFZHbFQBD22Rz9ISHwfWHfDm989pM' // <<< CRITICAL SECURITY RISK: Hardcoded API Key. Use environment variables.
 };
 
-const DB_PATH = './inventory.db'; // Updated DB path to match server.js
+const DB_PATH = './inventory.db';
 
 async function fetchSheetData() {
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SPREADSHEET_ID}/values/${CONFIG.SHEET_NAME}?key=${CONFIG.API_KEY}`;
@@ -32,9 +32,8 @@ async function fetchSheetData() {
     return rows.map(row => {
       const obj = {};
       headers.forEach((key, i) => {
-        // Ensure key is a string, trim it, convert to lowercase, and replace spaces with underscores
         let processedKey = String(key || '').trim().toLowerCase();
-        processedKey = processedKey.replace(/\s+/g, '_'); // e.g., "wholesale price" becomes "wholesale_price"
+        processedKey = processedKey.replace(/\s+/g, '_');
         if (processedKey) {
           obj[processedKey] = row[i] !== undefined && row[i] !== null ? String(row[i]).trim() : '';
         }
@@ -43,44 +42,25 @@ async function fetchSheetData() {
     });
   } catch (error) {
     console.error("❌ Error fetching or parsing sheet data:", error);
-    throw error; // Re-throw to be caught by the caller
+    throw error;
   }
 }
 
 async function importToDB() {
-  let db; // Declare db here to be accessible in finally
+  let db;
   try {
-    db = new sqlite3.Database(DB_PATH, (err) => {
-      if (err) {
-        console.error("❌ Could not connect to database:", err.message);
-        throw err; // Propagate error
-      }
-      console.log("🗄️ Connected to the SQLite database.");
-    });
+    db = new Database(DB_PATH, { verbose: console.log }); // Use better-sqlite3
+    console.log("🗄️ Connected to the SQLite database.");
 
     const items = await fetchSheetData();
     if (!items || items.length === 0) {
       console.log("ℹ️ No items to import.");
-      return; // Exit if no items
+      return;
     }
     console.log(`📥 Importing ${items.length} items...`);
 
-    // Promisify db operations for cleaner async/await usage
-    const run = (sql, params = []) => new Promise((resolve, reject) => {
-      db.run(sql, params, function(err) { // Use function for `this`
-        if (err) reject(err);
-        else resolve(this);
-      });
-    });
-
-    const prepare = (sql) => new Promise((resolve, reject) => {
-        const stmt = db.prepare(sql, (err) => {
-            if (err) reject(err);
-            else resolve(stmt);
-        });
-    });
-
-    await run(`
+    // Ensure table schema matches server.js, including product_code and barcode_value
+    db.exec(`
       CREATE TABLE IF NOT EXISTS products (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         category TEXT,
@@ -90,33 +70,37 @@ async function importToDB() {
         wholesale_price REAL NOT NULL,
         retail_price REAL,
         wholesale_total_price REAL,
-        retail_total_price REAL
+        retail_total_price REAL,
+        barcode_value TEXT,          -- Added
+        product_code TEXT UNIQUE     -- Added
       )
     `);
-    console.log("✔️ Table 'products' ensured (schema updated for original/current quantity).");
+    console.log("✔️ Table 'products' ensured (schema updated).");
 
-    await run("BEGIN TRANSACTION");
+    db.exec("BEGIN TRANSACTION");
     console.log("🔄 Started transaction.");
 
-    await run("DELETE FROM products");
+    // Clear existing products before import.
+    // Consider if this is always desired. Maybe an update/insert (upsert) strategy is better for some use cases.
+    db.exec("DELETE FROM products");
     console.log("🗑️ Cleared existing products from table.");
 
-    const insertStmt = await prepare(`
-      INSERT INTO products (category, subcategory, original_quantity, current_quantity, wholesale_price, retail_price, wholesale_total_price, retail_total_price)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    const insertStmt = db.prepare(`
+      INSERT INTO products (
+        category, subcategory, original_quantity, current_quantity, 
+        wholesale_price, retail_price, wholesale_total_price, retail_total_price,
+        product_code, barcode_value 
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    // Assumes sheet headers: 'category', 'subcategory', 'quantity' (for initial stock), 'wholesale_price'
-    // Optional sheet header: 'retail_price' (defaults to wholesale_price if missing)
-    // total prices are calculated based on initial quantity.
 
     for (const item of items) {
       const category = item.category || null;
       const subcategory = item.subcategory || null;
       
-      // This 'quantity' from sheet is the initial stock for both original and current
-      let initial_quantity = parseInt(item.original_quantity, 10); // Changed from item.quantity
+      let initial_quantity = parseInt(item.original_quantity, 10);
       if (isNaN(initial_quantity) || initial_quantity < 0) {
-        console.warn(`⚠️ Invalid quantity '${item.original_quantity}' for item, defaulting to 0. Item:`, item); // Changed from item.quantity
+        console.warn(`⚠️ Invalid quantity '${item.original_quantity}' for item, defaulting to 0. Item:`, item);
         initial_quantity = 0;
       }
 
@@ -131,59 +115,45 @@ async function importToDB() {
         retail_price = wholesale_price;
       }
 
-      // Totals are based on initial_quantity at the point of import
       const wholesale_total_price = initial_quantity * wholesale_price;
       const retail_total_price = initial_quantity * retail_price;
 
-      if (item.original_quantity === undefined) console.warn(`⚠️ Item missing 'original_quantity' property:`, item); // Changed from item.quantity
+      // Generate product_code and barcode_value similarly to server.js or leave them null/empty if not in sheet
+      // For simplicity, this example will set them to null if not directly in the sheet.
+      // A more robust solution would involve the same ID generation logic as in server.js if needed.
+      const product_code_from_sheet = item.product_code || null; 
+      const barcode_value_from_sheet = item.barcode_value || product_code_from_sheet; // Default barcode to product_code if not specified
+
+      if (item.original_quantity === undefined) console.warn(`⚠️ Item missing 'original_quantity' property:`, item);
       if (item.wholesale_price === undefined) console.warn(`⚠️ Item missing 'wholesale_price' property:`, item);
 
-
-      await new Promise((resolve, reject) => {
-        insertStmt.run(category, subcategory, initial_quantity, initial_quantity, wholesale_price, retail_price, wholesale_total_price, retail_total_price, function(err) {
-          if (err) reject(err);
-          else resolve();
-        });
-      });
+      insertStmt.run(
+        category, subcategory, initial_quantity, initial_quantity, 
+        wholesale_price, retail_price, wholesale_total_price, retail_total_price,
+        product_code_from_sheet, barcode_value_from_sheet
+      );
     }
     
-    await new Promise((resolve, reject) => {
-        insertStmt.finalize((err) => {
-            if (err) reject(err);
-            else resolve();
-        });
-    });
     console.log("✔️ Items inserted.");
 
-    await run("COMMIT");
+    db.exec("COMMIT");
     console.log("✅ Import complete. Transaction committed.");
 
   } catch (error) {
     console.error("❌ Error during database import process:", error.message);
     if (db) {
-      // Attempt to rollback if an error occurred during the transaction
       try {
-        await new Promise((resolve, reject) => {
-            db.run("ROLLBACK", (err) => {
-                if (err) reject(err);
-                else resolve();
-            });
-        });
+        db.exec("ROLLBACK");
         console.log("↩️ Transaction rolled back due to error.");
       } catch (rollbackError) {
         console.error("❌ Error rolling back transaction:", rollbackError.message);
       }
     }
-    throw error; // Re-throw to be caught by the final .catch
+    throw error; 
   } finally {
     if (db) {
-      db.close((err) => {
-        if (err) {
-          console.error("❌ Error closing database:", err.message);
-        } else {
-          console.log("🚪 Database connection closed.");
-        }
-      });
+      db.close();
+      console.log("🚪 Database connection closed.");
     }
   }
 }
@@ -191,8 +161,6 @@ async function importToDB() {
 importToDB()
   .then(() => console.log("🚀 Script finished successfully."))
   .catch(err => {
-    // console.error is already done inside importToDB for specific errors
-    // This final catch is for any unhandled promise rejections from importToDB
     console.error("💥 Unrecoverable error in import script:", err.message);
-    process.exitCode = 1; // Indicate failure
+    process.exitCode = 1;
   });
