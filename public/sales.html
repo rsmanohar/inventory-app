@@ -47,6 +47,18 @@
             <button onclick="markAsSale()">Mark as Sale</button>
         </section>
         <p id="sales-message"></p>
+
+        <section id="receipt-section" style="display:none; margin-top: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 5px;">
+            <h3>Sale Receipt</h3>
+            <div id="receipt-content">
+                <!-- Receipt details will be populated here -->
+            </div>
+            <div style="margin-top: 15px;">
+                <button id="print-receipt-btn">Print Receipt</button>
+                <button id="whatsapp-receipt-btn">Share to WhatsApp</button>
+                <button id="close-receipt-btn" style="margin-left: 10px;">Close</button>
+            </div>
+        </section>
     </main>
 
     <footer>
