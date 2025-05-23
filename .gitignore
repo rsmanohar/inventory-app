@@ -1,0 +1,12 @@
+# Dependencies
+node_modules/
+
+# Database
+inventory.db
+
+# Environment variables (if you create a .env file)
+.env
+
+# OS generated files
+.DS_Store
+Thumbs.db

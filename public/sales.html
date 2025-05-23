@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Page</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>Sales Processing</h1>
+        <nav>
+            <a href="index.html">Inventory</a>
+            <a href="sales.html">Sales</a>
+        </nav>
+    </header>
+
+    <main>
+        <section id="sales-entry">
+            <h2>Enter Product ID for Sale</h2>
+            <div>
+                <label for="productId">Product ID:</label>
+                <input type="number" id="productId" name="productId">
+                <button onclick="fetchProductForSale()">Fetch Product</button>
+            </div>
+        </section>
+
+        <section id="product-details-for-sale" style="display:none;">
+            <h3>Product Details</h3>
+            <p><strong>ID:</strong> <span id="sale-product-id"></span></p>
+            <p><strong>Category:</strong> <span id="sale-product-category"></span></p>
+            <p><strong>Subcategory:</strong> <span id="sale-product-subcategory"></span></p>
+            <p><strong>Current Quantity:</strong> <span id="sale-product-current-quantity"></span></p>
+            <p><strong>Current Wholesale / Retail Price:</strong> <span id="sale-product-current-price"></span></p>
+            /* Total price display removed as it's now wholesale vs retail and focus is on sale price per item */
+
+            <div>
+                <label for="quantitySold">Quantity Sold:</label>
+                <input type="number" id="quantitySold" name="quantitySold" min="1">
+            </div>
+            <div>
+                <label for="salePrice">Sale Price (per item):</label>
+                <input type="number" step="0.01" id="salePrice" name="salePrice">
+            </div>
+            <button onclick="markAsSale()">Mark as Sale</button>
+        </section>
+        <p id="sales-message"></p>
+    </main>
+
+    <footer>
+        <p>&copy; 2024 Inventory Management</p>
+    </footer>
+
+    <script src="sales.js"></script>
+</body>
+</html>
