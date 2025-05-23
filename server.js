@@ -90,10 +90,10 @@ app.get('/api/product/:identifier', (req, res) => {
       row = stmt.get(parseInt(identifier, 10));
     }
 
-    // If not found by ID or if identifier is not a simple integer, try by product_code
+    // If not found by ID or if identifier is not a simple integer, try by product_code (case-insensitive and trim identifier)
     if (!row) {
-      stmt = db.prepare('SELECT * FROM products WHERE product_code = ?');
-      row = stmt.get(identifier);
+      stmt = db.prepare('SELECT * FROM products WHERE product_code = ? COLLATE NOCASE');
+      row = stmt.get(String(identifier).trim()); // Trim identifier just in case
     }
 
     if (!row) {
@@ -114,8 +114,16 @@ app.post('/api/add', (req, res) => {
     return res.status(400).json({ error: "Category, subcategory, initial quantity and wholesale_price are required." });
   }
 
-  const catPrefix = String(category).substring(0, 2).toUpperCase();
-  const subcatPrefix = String(subcategory).substring(0, 3).toUpperCase();
+  // Trim category and subcategory
+  const trimmedCategory = String(category).trim();
+  const trimmedSubcategory = String(subcategory).trim();
+
+  if (!trimmedCategory || !trimmedSubcategory) {
+    return res.status(400).json({ error: "Category and subcategory names cannot be empty after trimming." });
+  }
+
+  const catPrefix = trimmedCategory.substring(0, 2).toUpperCase();
+  const subcatPrefix = trimmedSubcategory.substring(0, 3).toUpperCase();
   const idPrefix = `${catPrefix}-${subcatPrefix}-`;
 
   const initial_quantity = parseInt(quantity, 10);
@@ -153,7 +161,7 @@ app.post('/api/add', (req, res) => {
     const insertStmt = db.prepare(
       'INSERT INTO products (category, subcategory, original_quantity, current_quantity, wholesale_price, retail_price, wholesale_total_price, retail_total_price, product_code, barcode_value) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     );
-    const info = insertStmt.run(category, subcategory, initial_quantity, initial_quantity, wholesale_price, retail_price, wholesale_total_price, retail_total_price, product_code, barcode_value);
+    const info = insertStmt.run(trimmedCategory, trimmedSubcategory, initial_quantity, initial_quantity, wholesale_price, retail_price, wholesale_total_price, retail_total_price, product_code, barcode_value);
     
     res.json({ id: info.lastInsertRowid, product_code: product_code });
 
