@@ -1,5 +1,35 @@
 let currentProductForSale = null;
 
+document.addEventListener('DOMContentLoaded', () => {
+    // Set active navigation link
+    const currentPage = window.location.pathname.split("/").pop();
+    if (currentPage === 'sales.html') {
+        document.getElementById('nav-sales')?.classList.add('active');
+    }
+
+    // Barcode scanner button logic
+    document.getElementById('start-scanner-btn').addEventListener('click', () => {
+        const scannerDiv = document.getElementById('barcode-scanner');
+        scannerDiv.style.display = 'block';
+        const html5QrCode = new Html5Qrcode("barcode-scanner");
+        html5QrCode.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: 250 },
+            (decodedText, decodedResult) => {
+                html5QrCode.stop();
+                scannerDiv.style.display = 'none';
+                document.getElementById('productId').value = decodedText;
+                fetchProductForSale();
+            },
+            (errorMessage) => {
+                // Optionally handle scan errors
+            }
+        ).catch(err => {
+            alert("Unable to start barcode scanner: " + err);
+        });
+    });
+});
+
 async function fetchProductForSale() {
     const productId = document.getElementById('productId').value;
     const messageEl = document.getElementById('sales-message');
@@ -29,20 +59,41 @@ async function fetchProductForSale() {
         }
         currentProductForSale = await response.json();
 
-        document.getElementById('sale-product-id').textContent = currentProductForSale.id;
+        document.getElementById('sale-product-id').textContent = currentProductForSale.product_code || currentProductForSale.id; // Display product_code
         document.getElementById('sale-product-category').textContent = currentProductForSale.category || 'N/A';
         document.getElementById('sale-product-subcategory').textContent = currentProductForSale.subcategory || 'N/A';
-        document.getElementById('sale-product-current-quantity').textContent = currentProductForSale.quantity;
+        // Display current_quantity as the available stock for sale
+        document.getElementById('sale-product-current-quantity').textContent = currentProductForSale.current_quantity;
         
         const wholesalePrice = parseFloat(currentProductForSale.wholesale_price || 0);
-        const retailPrice = parseFloat(currentProductForSale.retail_price || wholesalePrice); // Default to wholesale if retail is not set
+        const retailPrice = parseFloat(currentProductForSale.retail_price || wholesalePrice);
 
-        document.getElementById('sale-product-current-price').innerHTML = `Wholesale: $${wholesalePrice.toFixed(2)} / Retail: $${retailPrice.toFixed(2)}`; // Changed to show both
-        // Total prices are not directly shown here anymore, but could be if needed. The main display is per-item price.
+        // The element 'sale-product-current-price' was removed from HTML, so this line is no longer needed.
 
-        document.getElementById('quantitySold').value = '1'; // Default to 1
-        document.getElementById('quantitySold').max = currentProductForSale.quantity; // Max is current stock
-        document.getElementById('salePrice').value = retailPrice.toFixed(2); // Default salePrice input to current retail_price
+        document.getElementById('quantitySold').value = '1';
+        document.getElementById('quantitySold').max = currentProductForSale.current_quantity; // Max is current_quantity
+        document.getElementById('salePrice').value = retailPrice.toFixed(2); // Input field for sale price, no symbol here
+
+        // Generate barcode for the fetched product
+        const saleBarcodeEl = document.getElementById('sale-product-barcode');
+        const valueForSaleBarcode = currentProductForSale.product_code || String(currentProductForSale.id); // Use product_code
+        if (valueForSaleBarcode && saleBarcodeEl) {
+            try {
+                JsBarcode(saleBarcodeEl, valueForSaleBarcode, {
+                    format: "CODE128",
+                    lineColor: "#000",
+                    width: 2,
+                    height: 50,
+                    displayValue: true,
+                    fontSize: 16
+                });
+            } catch (e) {
+                console.error("Error generating barcode on sales page:", e);
+                saleBarcodeEl.innerHTML = "Error";
+            }
+        } else if (saleBarcodeEl) {
+            saleBarcodeEl.innerHTML = "N/A";
+        }
 
         detailsSection.style.display = 'block';
         messageEl.textContent = 'Product details loaded.';
@@ -78,21 +129,20 @@ async function markAsSale() {
         return;
     }
 
-    if (quantitySold > currentProductForSale.quantity) {
-        messageEl.textContent = `Cannot sell ${quantitySold} items. Only ${currentProductForSale.quantity} available.`;
+    // Check against current_quantity
+    if (quantitySold > currentProductForSale.current_quantity) {
+        messageEl.textContent = `Cannot sell ${quantitySold} items. Only ${currentProductForSale.current_quantity} available.`;
         messageEl.style.color = 'red';
         return;
     }
 
-    const newQuantity = currentProductForSale.quantity - quantitySold;
-    // When a sale is made, the product's retail_price is updated to the salePrice.
-    // The wholesale_price of the product itself does not change due to a sale.
-    // The server will recalculate wholesale_total_price and retail_total_price.
+    const new_current_quantity = currentProductForSale.current_quantity - quantitySold;
+    
     const updatePayload = {
-        quantity: newQuantity,
-        retail_price: salePrice, // This sale's price becomes the new retail_price for the remaining stock
-        // wholesale_price is not changed by a sale action on this page.
-        // category and subcategory also remain unchanged.
+        quantity: new_current_quantity, // This is the new current_quantity
+        retail_price: salePrice,
+        // original_quantity is not sent, so server keeps it as is.
+        // wholesale_price is not changed by a sale.
     };
 
     try {
@@ -111,7 +161,7 @@ async function markAsSale() {
 
         const result = await response.json();
         if (result.updated > 0) {
-            messageEl.textContent = `Sale successful! Product ID ${currentProductForSale.id} updated. New quantity: ${newQuantity}.`;
+            messageEl.textContent = `Sale successful! Product ID ${currentProductForSale.id} updated. New quantity: ${new_current_quantity}.`;
             messageEl.style.color = 'green';
             // Clear fields and hide details section after successful sale
             document.getElementById('product-details-for-sale').style.display = 'none';

@@ -85,14 +85,15 @@ async function importToDB() {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         category TEXT,
         subcategory TEXT,
-        quantity INTEGER NOT NULL,
+        original_quantity INTEGER,
+        current_quantity INTEGER NOT NULL,
         wholesale_price REAL NOT NULL,
         retail_price REAL,
         wholesale_total_price REAL,
         retail_total_price REAL
       )
     `);
-    console.log("✔️ Table 'products' ensured (schema updated for wholesale/retail).");
+    console.log("✔️ Table 'products' ensured (schema updated for original/current quantity).");
 
     await run("BEGIN TRANSACTION");
     console.log("🔄 Started transaction.");
@@ -101,21 +102,22 @@ async function importToDB() {
     console.log("🗑️ Cleared existing products from table.");
 
     const insertStmt = await prepare(`
-      INSERT INTO products (category, subcategory, quantity, wholesale_price, retail_price, wholesale_total_price, retail_total_price)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO products (category, subcategory, original_quantity, current_quantity, wholesale_price, retail_price, wholesale_total_price, retail_total_price)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    // Assumes sheet headers: 'category', 'subcategory', 'quantity', 'wholesale_price'
+    // Assumes sheet headers: 'category', 'subcategory', 'quantity' (for initial stock), 'wholesale_price'
     // Optional sheet header: 'retail_price' (defaults to wholesale_price if missing)
-    // total prices are calculated.
+    // total prices are calculated based on initial quantity.
 
     for (const item of items) {
       const category = item.category || null;
       const subcategory = item.subcategory || null;
       
-      let quantity = parseInt(item.quantity, 10);
-      if (isNaN(quantity) || quantity < 0) {
-        console.warn(`⚠️ Invalid quantity '${item.quantity}' for item, defaulting to 0. Item:`, item);
-        quantity = 0;
+      // This 'quantity' from sheet is the initial stock for both original and current
+      let initial_quantity = parseInt(item.original_quantity, 10); // Changed from item.quantity
+      if (isNaN(initial_quantity) || initial_quantity < 0) {
+        console.warn(`⚠️ Invalid quantity '${item.original_quantity}' for item, defaulting to 0. Item:`, item); // Changed from item.quantity
+        initial_quantity = 0;
       }
 
       let wholesale_price = parseFloat(item.wholesale_price);
@@ -125,21 +127,20 @@ async function importToDB() {
       }
       
       let retail_price = parseFloat(item.retail_price);
-      if (isNaN(retail_price) || retail_price < 0) {
-        // If retail_price is not in sheet or invalid, default to wholesale_price
+      if (isNaN(retail_price) || retail_price < 0 || item.retail_price === undefined || String(item.retail_price).trim() === '') {
         retail_price = wholesale_price;
       }
 
-      const wholesale_total_price = quantity * wholesale_price;
-      const retail_total_price = quantity * retail_price;
+      // Totals are based on initial_quantity at the point of import
+      const wholesale_total_price = initial_quantity * wholesale_price;
+      const retail_total_price = initial_quantity * retail_price;
 
-      // Ensure required sheet columns are present
-      if (item.quantity === undefined) console.warn(`⚠️ Item missing 'quantity' property:`, item);
+      if (item.original_quantity === undefined) console.warn(`⚠️ Item missing 'original_quantity' property:`, item); // Changed from item.quantity
       if (item.wholesale_price === undefined) console.warn(`⚠️ Item missing 'wholesale_price' property:`, item);
 
 
       await new Promise((resolve, reject) => {
-        insertStmt.run(category, subcategory, quantity, wholesale_price, retail_price, wholesale_total_price, retail_total_price, function(err) {
+        insertStmt.run(category, subcategory, initial_quantity, initial_quantity, wholesale_price, retail_price, wholesale_total_price, retail_total_price, function(err) {
           if (err) reject(err);
           else resolve();
         });

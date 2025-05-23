@@ -2,22 +2,26 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inventory Manager</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.0/dist/JsBarcode.all.min.js"></script>
 </head>
 <body>
     <header>
         <h1>Inventory Management</h1>
         <nav>
-            <a href="index.html">Inventory</a>
-            <a href="sales.html">Sales</a>
+            <a href="index.html" id="nav-inventory">Inventory</a>
+            <a href="sales.html" id="nav-sales">Sales</a>
         </nav>
     </header>
-    <h1>Inventory Manager</h1>
+    <main class="container">
+        <h1>Inventory Manager</h1>
 
-    <!-- Filters -->
-    <div id="filters">
-        <select id="filter-category">
+        <!-- Filters -->
+        <div id="filters">
+            <select id="filter-category">
             <option value="">All Categories</option>
         </select>
         <select id="filter-subcategory">
@@ -27,25 +31,37 @@
         <button onclick="resetFilters()">Reset</button>
     </div>
 
-    <button onclick="openAddProductModal()">Add Product</button>
+    <div id="monthly-summary-section">
+        <h2>Monthly Sales Summary</h2>
+        <div id="monthly-summary-data">
+            <!-- Summary data will be populated here by script.js -->
+            <p>Loading summary...</p>
+        </div>
+    </div>
 
-    <table id="productTable">
-        <thead>
-            <tr>
-                <th>ID</th>
+    <button onclick="openAddProductModal()">Add Product</button>
+    
+    <div class="table-container">
+        <table id="productTable">
+            <thead>
+                <tr>
+                    <th>Product Code</th>
                 <th>Category</th>
                 <th>Subcategory</th>
-                <th>Quantity</th>
+                <th>Original Qty</th>
+                <th>Current Qty</th>
                 <th>Wholesale Price</th>
                 <th>Retail Price</th>
-                <th>Wholesale Total</th>
-                <th>Retail Total</th>
-                <th>Profit Margin</th>
+                <th>Wholesale Total (Current)</th>
+                <th>Retail Total (Current)</th>
+                <th>Profit (Sold Items)</th>
                 <th>Actions</th>
+                <th>Barcode</th>
             </tr>
         </thead>
         <tbody></tbody>
-    </table>
+        </table>
+    </div>
 
     <!-- Add Product Modal -->
     <div id="addProductModal" class="modal" style="display:none;">
@@ -57,22 +73,22 @@
                 <select id="modal-category" required></select><br>
                 <label>Subcategory:</label>
                 <select id="modal-subcategory" required></select><br>
-                <label>Quantity:</label>
+                <label>Initial Quantity:</label>
                 <input type="number" id="modal-quantity" min="1" required><br>
                 <label>Wholesale Price:</label>
                 <input type="number" id="modal-wholesale-price" min="0" step="0.01" required><br>
                 <label>Retail Price (optional, defaults to wholesale):</label>
                 <input type="number" id="modal-retail-price" min="0" step="0.01"><br>
-                <label>Wholesale Total Price:</label>
+                <label>Wholesale Total Price (Initial):</label>
                 <input type="number" id="modal-wholesale-totalprice" readonly><br>
-                <label>Retail Total Price:</label>
+                <label>Retail Total Price (Initial):</label>
                 <input type="number" id="modal-retail-totalprice" readonly><br>
                 <button type="submit">Add</button>
                 <button type="button" onclick="closeAddProductModal()">Cancel</button>
             </form>
         </div>
     </div>
-
+    </main>
     <script src="script.js"></script>
 </body>
 </html>

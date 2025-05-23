@@ -4,20 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sales Page</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <header>
         <h1>Sales Processing</h1>
         <nav>
-            <a href="index.html">Inventory</a>
-            <a href="sales.html">Sales</a>
+            <a href="index.html" id="nav-inventory">Inventory</a>
+            <a href="sales.html" id="nav-sales">Sales</a>
         </nav>
     </header>
 
-    <main>
+    <main class="container">
         <section id="sales-entry">
             <h2>Enter Product ID for Sale</h2>
+            <button id="start-scanner-btn">Scan Barcode</button>
+<div id="barcode-scanner" style="width:300px; display:none;"></div>
             <div>
                 <label for="productId">Product ID:</label>
                 <input type="number" id="productId" name="productId">
@@ -31,9 +34,8 @@
             <p><strong>Category:</strong> <span id="sale-product-category"></span></p>
             <p><strong>Subcategory:</strong> <span id="sale-product-subcategory"></span></p>
             <p><strong>Current Quantity:</strong> <span id="sale-product-current-quantity"></span></p>
-            <p><strong>Current Wholesale / Retail Price:</strong> <span id="sale-product-current-price"></span></p>
-            /* Total price display removed as it's now wholesale vs retail and focus is on sale price per item */
-
+            <p><strong>Barcode:</strong> <svg id="sale-product-barcode"></svg></p>
+            
             <div>
                 <label for="quantitySold">Quantity Sold:</label>
                 <input type="number" id="quantitySold" name="quantitySold" min="1">
@@ -50,7 +52,8 @@
     <footer>
         <p>&copy; 2024 Inventory Management</p>
     </footer>
-
+    </main>
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="sales.js"></script>
 </body>
 </html>
