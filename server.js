@@ -78,17 +78,30 @@ app.get('/api/categories', (req, res) => {
   }
 });
 
-// Get a single product by ID
-app.get('/api/product/:id', (req, res) => {
-  const id = req.params.id;
+// Get a single product by ID or product_code
+app.get('/api/product/:identifier', (req, res) => {
+  const identifier = req.params.identifier;
+  let stmt;
+  let row;
   try {
-    const stmt = db.prepare('SELECT * FROM products WHERE id = ?');
-    const row = stmt.get(id);
+    // Try to interpret the identifier as a number (ID) first
+    if (!isNaN(identifier) && Number.isInteger(parseFloat(identifier))) {
+      stmt = db.prepare('SELECT * FROM products WHERE id = ?');
+      row = stmt.get(parseInt(identifier, 10));
+    }
+
+    // If not found by ID or if identifier is not a simple integer, try by product_code
+    if (!row) {
+      stmt = db.prepare('SELECT * FROM products WHERE product_code = ?');
+      row = stmt.get(identifier);
+    }
+
     if (!row) {
       return res.status(404).json({ error: 'Product not found' });
     }
     res.json(row);
   } catch (err) {
+    console.error(`Error fetching product by identifier ${identifier}:`, err.message);
     res.status(500).json({ error: err.message });
   }
 });
