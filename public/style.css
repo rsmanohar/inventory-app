@@ -6,6 +6,8 @@ body {
     background-color: #f4f4f4;
     color: #333;
     line-height: 1.6;
+    max-width: 100vw;
+    overflow-x: auto;
 }
 
 .container {
@@ -271,4 +273,25 @@ footer {
     .receipt-total {
         font-size: 11pt !important;
     }
+}
+
+/* Make tables horizontally scrollable on small screens */
+@media (max-width: 600px) {
+  .container, main, body {
+    overflow-x: auto;
+  }
+  .table-responsive {
+    width: 100%;
+    overflow-x: auto;
+  }
+  table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
+  th, td {
+    white-space: nowrap;
+  }
 }
